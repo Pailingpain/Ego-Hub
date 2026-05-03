@@ -338,25 +338,20 @@ local SilentAimFOV
 if hasDrawing then
     pcall(function()
         SilentAimFOV = Drawing.new("Circle")
-        SilentAimFOV.Visible      = false
-        SilentAimFOV.Filled       = false
-        SilentAimFOV.NumSides     = 80
-        SilentAimFOV.Radius       = 120
-        SilentAimFOV.Thickness    = 2
-        SilentAimFOV.Transparency = 0
-        SilentAimFOV.Color        = Color3.fromRGB(255, 255, 255)
-        SilentAimFOV.ZIndex       = 10
-        SilentAimFOV.Position     = Vector2.new(
+        SilentAimFOV.Visible = false
+        SilentAimFOV.Filled = false
+        SilentAimFOV.NumSides = 80
+        SilentAimFOV.Radius = 120
+        SilentAimFOV.Thickness = 2
+        SilentAimFOV.Transparency = 1
+        SilentAimFOV.Color = Color3.fromRGB(255,255,255)
+        SilentAimFOV.ZIndex = 10
+        SilentAimFOV.Position = Vector2.new(
             Camera.ViewportSize.X / 2,
             Camera.ViewportSize.Y / 2
         )
     end)
 end
-
-local _dummyPart = Instance.new("Part")
-_dummyPart.Anchored   = true
-_dummyPart.CanCollide = false
-_dummyPart.Parent     = nil
 
 local function HasLineOfSight(targetPos)
     local lc = LocalPlayer.Character
@@ -380,7 +375,7 @@ local function GetNearestToMouse(fov, teamCheck, wallCheck)
         local char = p.Character
         if not char then continue end
         local part = char:FindFirstChild(Config.SilentAim.TargetPart) or char:FindFirstChild("HumanoidRootPart")
-        local hum  = char:FindFirstChildOfClass("Humanoid")
+        local hum = char:FindFirstChildOfClass("Humanoid")
         if not part or not hum or hum.Health <= 0 then continue end
 
         if wallCheck and not HasLineOfSight(part.Position) then continue end
@@ -399,46 +394,32 @@ local function PredictPos(character, amount, method)
     if not hrp then return nil end
 
     local v = hrp.AssemblyLinearVelocity
-    method   = method or "Velocity"
+    method = method or "Velocity"
 
     if method == "Velocity" then
         return hrp.Position + v * amount
-
     elseif method == "HRPChecking" then
-        return hrp.Position + v * (math.clamp(v.Magnitude / 20, 0, 1) * amount)
-
+        return hrp.Position + v * (math.clamp(v.Magnitude/20, 0, 1) * amount)
     elseif method == "Raycast" then
         if v.Magnitude < 0.1 then return hrp.Position end
-        local dir    = v.Unit * amount * 20
+        local dir = v.Unit * amount * 20
         local params = RaycastParams.new()
         params.FilterType = Enum.RaycastFilterType.Exclude
-        params.FilterDescendantsInstances = { character, LocalPlayer.Character or _dummyPart }
+        params.FilterDescendantsInstances = { character, LocalPlayer.Character or Instance.new("Part") }
         local res = Workspace:Raycast(hrp.Position, dir, params)
         return res and res.Position or (hrp.Position + dir)
-
     elseif method == "Hybrid" then
-        if v.Magnitude > 15 then
-            return hrp.Position + v * amount
-        else
-            return hrp.Position + v * amount * 0.5
-        end
+        if v.Magnitude > 15 then return hrp.Position + v * amount
+        else return hrp.Position + v * amount * 0.5 end
     end
-
     return hrp.Position
 end
 
-local function ShouldRedirect()
-    if not Config.SilentAim.Enabled then return false end
-    if Config.SilentAim.HitChance >= 100 then return true end
-    return math.random(1, 100) <= Config.SilentAim.HitChance
-end
+local function GetSilentAimTarget()
+    if not Config.SilentAim.Enabled then return nil end
+    if math.random(1, 100) > Config.SilentAim.HitChance then return nil end
 
-local function ResolveRedirectPos()
-    local target = GetNearestToMouse(
-        Config.SilentAim.FOV,
-        Config.SilentAim.TeamCheck,
-        Config.SilentAim.WallCheck
-    )
+    local target = GetNearestToMouse(Config.SilentAim.FOV, Config.SilentAim.TeamCheck, Config.SilentAim.WallCheck)
     if not target then return nil end
     local char = target.Character
     if not char then return nil end
@@ -447,95 +428,70 @@ local function ResolveRedirectPos()
 
     local pos = part.Position
     if Config.SilentAim.Prediction then
-        pos = PredictPos(char, Config.SilentAim.PredictionAmount, Config.SilentAim.PredictionMethod)
-            or part.Position
+        pos = PredictPos(char, Config.SilentAim.PredictionAmount, Config.SilentAim.PredictionMethod) or part.Position
     end
-    return pos
-end
-
-local _cachedRedirectPos = nil
-local _cacheFrame        = 0
-
-local function GetCachedRedirect()
-    local now = tick()
-    if _cacheFrame == 0 or (now - _cacheFrame) > (1 / 240) then
-        _cacheFrame = now
-        if ShouldRedirect() then
-            _cachedRedirectPos = ResolveRedirectPos()
-        else
-            _cachedRedirectPos = nil
-        end
-    end
-    return _cachedRedirectPos
+    return pos, part
 end
 
 local function UpdateSilentAimFOV()
     if not SilentAimFOV then return end
     if Config.SilentAim.Enabled and Config.SilentAim.FOVVisible then
-        SilentAimFOV.Visible  = true
-        SilentAimFOV.Position = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
-        SilentAimFOV.Radius   = Config.SilentAim.FOV
-        SilentAimFOV.Color    = CT()
+        SilentAimFOV.Visible = true
+        SilentAimFOV.Position = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
+        SilentAimFOV.Radius = Config.SilentAim.FOV
+        SilentAimFOV.Color = CT()
     else
         SilentAimFOV.Visible = false
     end
 end
 
+-- Hook __namecall for Raycast/Mouse.Hit redirection
 if hasHookMeta then
     local oldNamecall
     oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
         local method = getnamecallmethod()
-        local args   = { ... }
+        local args = {...}
 
         if Config.SilentAim.Enabled then
+            -- Mouse.Hit override (legacy games)
+            if method == "GetMouseLocation" or method == "ViewportPointToRay" then
+                -- nothing here, handled by Mouse.Hit fallback
+            end
 
+            -- Workspace:Raycast hook
             if method == "Raycast" and self == Workspace then
-                local pos = GetCachedRedirect()
+                local pos = GetSilentAimTarget()
                 if pos and args[1] and args[2] then
-                    args[2] = pos - args[1]
+                    local origin = args[1]
+                    local newDir = (pos - origin)
+                    args[2] = newDir
                     return oldNamecall(self, table.unpack(args))
                 end
             end
 
-            if (method == "FindPartOnRay" or method == "FindPartOnRayWithIgnoreList") and self == Workspace then
-                local pos = GetCachedRedirect()
+            -- FindPartOnRayWithIgnoreList
+            if method == "FindPartOnRayWithIgnoreList" or method == "FindPartOnRay" then
+                local pos = GetSilentAimTarget()
                 if pos and args[1] then
-                    local r           = args[1]
-                    local origin      = r.Origin
-                    local dir         = pos - origin
-                    local originalLen = r.Direction.Magnitude
-                    args[1] = Ray.new(origin, dir.Unit * math.min(dir.Magnitude, originalLen))
+                    local r = args[1]
+                    local origin = r.Origin
+                    local newRay = Ray.new(origin, (pos - origin).Unit * 1000)
+                    args[1] = newRay
                     return oldNamecall(self, table.unpack(args))
                 end
             end
-
-            if method == "ViewportPointToRay" and self == Camera then
-                local pos = GetCachedRedirect()
-                if pos then
-                    local origin = Camera.CFrame.Position
-                    return Ray.new(origin, (pos - origin).Unit * 1000)
-                end
-            end
-
         end
 
         return oldNamecall(self, ...)
     end)
 end
 
+-- Mouse.Hit fallback (always active)
 RunService.Heartbeat:Connect(function()
-    if not Config.SilentAim.Enabled then
-        _cachedRedirectPos = nil
-        _cacheFrame        = 0
-        return
-    end
-    if ShouldRedirect() then
-        _cachedRedirectPos = ResolveRedirectPos()
-    else
-        _cachedRedirectPos = nil
-    end
-    if _cachedRedirectPos then
-        pcall(function() Mouse.Hit = CFrame.new(_cachedRedirectPos) end)
+    if not Config.SilentAim.Enabled then return end
+    local pos = GetSilentAimTarget()
+    if pos then
+        pcall(function() Mouse.Hit = CFrame.new(pos) end)
     end
 end)
 
@@ -857,7 +813,7 @@ RegisterThemed(HUDStroke, "Color", "accent")
 
 local HUDLockIcon = Create("TextLabel", {
     Size = UDim2.new(0,14,0,14), Position = UDim2.new(1,-18,0,4),
-    BackgroundTransparency = 1, Text = "馃敁",
+    BackgroundTransparency = 1, Text = "🔓",
     TextColor3 = Color3.fromRGB(150,165,210), TextSize = 11,
     Font = Enum.Font.Gotham, ZIndex = 151, Parent = HUDFrame,
 })
@@ -898,7 +854,7 @@ HUDFrame.InputBegan:Connect(function(input)
             if hudHoldStart == pressedAt and (input.UserInputState == Enum.UserInputState.Begin or hudDragging) then
                 -- still held
                 hudLocked = not hudLocked
-                HUDLockIcon.Text = hudLocked and "馃敀" or "馃敁"
+                HUDLockIcon.Text = hudLocked and "🔒" or "🔓"
                 HUDLockIcon.TextColor3 = hudLocked and Color3.fromRGB(255,180,60) or Color3.fromRGB(150,165,210)
                 hudDragging = false
                 Notify("HUD", hudLocked and "Position locked" or "Position unlocked", "info", 1.5)
@@ -992,7 +948,7 @@ local function WinBtn(xOff, bg, sym)
 end
 
 local CloseBtn = WinBtn(-28, Color3.fromRGB(200,60,60), "X")
-local MinBtn   = WinBtn(-56, Color3.fromRGB(200,160,40), "鈭�")
+local MinBtn   = WinBtn(-56, Color3.fromRGB(200,160,40), "−")
 
 -- DRAG (mouse + touch, works minimized)
 local dragging, dragStart, startPos = false, nil, nil
@@ -1083,7 +1039,7 @@ local function setMinimized(state)
                 if CmdBarFrame then CmdBarFrame.Visible = true end
             end
         end)
-        MinBtn.Text = "鈭�"
+        MinBtn.Text = "−"
     end
 end
 
@@ -1344,7 +1300,7 @@ local function InfoBox(page, txt)
     Padding(f, 10)
 end
 
--- FIXED Slider 鈥� uses local connections per slider
+-- FIXED Slider — uses local connections per slider
 local function Slider(page, lbl, desc, min, max, default, cb)
     local val = default or min
     local row = Create("Frame", {
@@ -1436,7 +1392,7 @@ local function Slider(page, lbl, desc, min, max, default, cb)
     end)
 end
 
--- FIXED Dropdown 鈥� uses overlay parent so it's always on top
+-- FIXED Dropdown — uses overlay parent so it's always on top
 local function Dropdown(page, lbl, desc, options, default, cb)
     local current = default or options[1]
     local row = Create("Frame", {
@@ -1468,7 +1424,7 @@ local function Dropdown(page, lbl, desc, options, default, cb)
     local btn = Create("TextButton", {
         Size = UDim2.new(0,120,0,28), Position = UDim2.new(1,-130,0.5,-14),
         BackgroundColor3 = Color3.fromRGB(25,30,55),
-        Text = current .. "  鈻�", TextColor3 = Color3.fromRGB(200,215,255),
+        Text = current .. "  ▼", TextColor3 = Color3.fromRGB(200,215,255),
         Font = Enum.Font.Gotham, TextSize = 11,
         ZIndex = 14, Parent = row,
     })
@@ -1507,7 +1463,7 @@ local function Dropdown(page, lbl, desc, options, default, cb)
             oBtn.MouseLeave:Connect(function() oBtn.BackgroundTransparency = 1 end)
             oBtn.MouseButton1Click:Connect(function()
                 current = opt
-                btn.Text = current .. "  鈻�"
+                btn.Text = current .. "  ▼"
                 if list then list:Destroy(); list = nil end
                 listOpen = false
                 if cb then cb(opt) end
@@ -1742,7 +1698,7 @@ Btn(DashPage, "Disable All Features", "Emergency kill switch", "Disable", functi
 end, Color3.fromRGB(200,60,60))
 
 Section(DashPage, "Info")
-InfoBox(DashPage, "Ego Hub | Private v1\n\n鈥� RightShift = Toggle GUI\n鈥� Q = CamLock target\n鈥� E = AimLock target\n鈥� Chat: !ego <cmd>\n鈥� Hold FPS HUD for 0.4s to lock position\n鈥� Click 鈿� next to Run buttons to configure")
+InfoBox(DashPage, "Ego Hub | Private v1\n\n• RightShift = Toggle GUI\n• Q = CamLock target\n• E = AimLock target\n• Chat: !ego <cmd>\n• Hold FPS HUD for 0.4s to lock position\n• Click ⚙ next to Run buttons to configure")
 
 -- ============================================================
 --          COMMANDS PAGE w/ config sub-panels
@@ -1957,7 +1913,7 @@ for _, def in ipairs(Commands) do
         local cb = Create("TextButton", {
             Size = UDim2.new(0,28,0,26), Position = UDim2.new(1,-90,0.5,-13),
             BackgroundColor3 = Color3.fromRGB(60,80,140),
-            Text = "鈿�", TextColor3 = Color3.fromRGB(255,255,255),
+            Text = "⚙", TextColor3 = Color3.fromRGB(255,255,255),
             Font = Enum.Font.GothamBold, TextSize = 14,
             ZIndex = 15, Parent = card,
         })
@@ -1981,7 +1937,7 @@ for _, def in ipairs(Commands) do
                     VList(cfgPanel, 5)
                     Create("TextLabel", {
                         Size = UDim2.new(1,0,0,18), BackgroundTransparency = 1,
-                        Text = "鈿� " .. cat .. " Configuration",
+                        Text = "⚙ " .. cat .. " Configuration",
                         TextColor3 = col, Font = Enum.Font.GothamBold,
                         TextSize = 11, TextXAlignment = Enum.TextXAlignment.Left,
                         ZIndex = 15, Parent = cfgPanel,
@@ -2118,7 +2074,7 @@ local CfgPage = TabData["Configs"].Page
 Section(CfgPage, "Save / Load Configs")
 
 if not hasFiles then
-    InfoBox(CfgPage, "鈿� Your executor does not support file APIs (writefile/readfile).\nConfig saving is disabled.")
+    InfoBox(CfgPage, "⚠ Your executor does not support file APIs (writefile/readfile).\nConfig saving is disabled.")
 end
 
 local NameInputFrame = Create("Frame", {
@@ -2255,7 +2211,7 @@ Create("UIListLayout", {
 
 local saveB = Create("TextButton", {
     Size = UDim2.new(0,120,1,0), BackgroundColor3 = Color3.fromRGB(60,180,100),
-    Text = "馃捑 Save Config", TextColor3 = Color3.fromRGB(255,255,255),
+    Text = "💾 Save Config", TextColor3 = Color3.fromRGB(255,255,255),
     Font = Enum.Font.GothamBold, TextSize = 12,
     ZIndex = 14, Parent = BtnRow,
 })
@@ -2270,7 +2226,7 @@ end)
 
 local refreshB = Create("TextButton", {
     Size = UDim2.new(0,100,1,0), BackgroundColor3 = CT(),
-    Text = "馃攧 Refresh", TextColor3 = Color3.fromRGB(255,255,255),
+    Text = "🔄 Refresh", TextColor3 = Color3.fromRGB(255,255,255),
     Font = Enum.Font.GothamBold, TextSize = 12,
     ZIndex = 14, Parent = BtnRow,
 })
@@ -2334,17 +2290,17 @@ end
 
 Section(SettPage, "Feature Descriptions")
 InfoBox(SettPage,
-    "鈼� ESP 鈥� Visual overlay (boxes, names, HP, distance, tracers).\n\n"..
-    "鈼� Silent Aim 鈥� Redirects shots to nearest target in FOV.\n\n"..
-    "鈼� CamLock 鈥� Q to forcibly lock CAMERA onto target.\n\n"..
-    "鈼� AimLock 鈥� E to forcibly lock AIM onto target.\n\n"..
-    "鈼� Anti-Lag 鈥� Removes particles/fire/smoke/beams/trails (continuous).\n\n"..
-    "鈼� Clean Mode 鈥� Removes fog, shadows, billboards, post-fx.\n\n"..
-    "鈼� FPS HUD 鈥� Floating draggable widget; hold 0.4s to lock."
+    "● ESP — Visual overlay (boxes, names, HP, distance, tracers).\n\n"..
+    "● Silent Aim — Redirects shots to nearest target in FOV.\n\n"..
+    "● CamLock — Q to forcibly lock CAMERA onto target.\n\n"..
+    "● AimLock — E to forcibly lock AIM onto target.\n\n"..
+    "● Anti-Lag — Removes particles/fire/smoke/beams/trails (continuous).\n\n"..
+    "● Clean Mode — Removes fog, shadows, billboards, post-fx.\n\n"..
+    "● FPS HUD — Floating draggable widget; hold 0.4s to lock."
 )
 
 Section(SettPage, "Keybinds")
-InfoBox(SettPage, "RightShift  鈫�  Toggle GUI\nQ            鈫�  CamLock target lock/unlock\nE            鈫�  AimLock target lock/unlock\n!ego <cmd>   鈫�  Chat command")
+InfoBox(SettPage, "RightShift  →  Toggle GUI\nQ            →  CamLock target lock/unlock\nE            →  AimLock target lock/unlock\n!ego <cmd>   →  Chat command")
 
 Section(SettPage, "GUI Options")
 Btn(SettPage, "Reset Window Position", "Center the window", "Reset", function()
@@ -2423,4 +2379,4 @@ end
 task.wait(1)
 Notify("Ego Hub | Private", "v1 Loaded! RightShift to toggle.", "success")
 task.wait(1.2)
-Notify("Tip", "Hold FPS HUD 0.4s to lock. Configs tab to save/load.", "info")   
+Notify("Tip", "Hold FPS HUD 0.4s to lock. Configs tab to save/load.", "info")
