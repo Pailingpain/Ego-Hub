@@ -2423,4 +2423,4 @@ end
 task.wait(1)
 Notify("Ego Hub | Private", "v1 Loaded! RightShift to toggle.", "success")
 task.wait(1.2)
-Notify("Tip", "Hold FPS HUD 0.4s to lock. Configs tab to save/load
+Notify("Tip", "Hold FPS HUD 0.4s to lock. Configs tab to save/load.", "info")   
